@@ -1,20 +1,9 @@
 #include "userDef.h"
 #include <Microduino_Audio.h>
+#include <Microduino_AudioPro.h>
+#include "file.h"
+AudioPro midiPlayer;
 
-
-//Core UART Port: [SoftSerial] [D2,D3]
-#if defined (__AVR_ATmega168__) || defined (__AVR_ATmega328__) || defined (__AVR_ATmega328P__) || defined(__AVR_ATmega32U4__)
-#include <SoftwareSerial.h>
-SoftwareSerial mySerial(2, 3); /* RX:D2, TX:D3 */
-#define AudioSerial mySerial
-#endif
-
-//Core+ UART Port: [Serial1] [D2,D3]
-#if defined(__AVR_ATmega1284P__) || defined (__AVR_ATmega644P__) || defined(__AVR_ATmega128RFA1__)
-#define AudioSerial Serial1
-#endif
-
-Audio audio(&AudioSerial);
 
 #include <Microduino_ColorLED.h>
 ColorLED strip = ColorLED(1, PIN);//设置彩灯个数，引脚
@@ -23,10 +12,14 @@ void setup() {
   pinMode(BODY_PIN1, INPUT);
   pinMode(BODY_PIN2, INPUT);
   // initialize serial:
-  Serial.begin(9600);
-  audio.begin(DEVICE_FLASH, MODE_ONE_STOP, MUSICVOL);
-  delay(200);
-  audio.setVolume(MUSICVOL);
+  Serial.begin(115200);
+  if (! midiPlayer.begin()) { // initialise the music player
+    Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
+    while (1);
+  }
+  Serial.println(F("VS1053 found"));
+  midiPlayer.setVolume(127);  //left & right 0-127
+  midiPlayer.useInterrupt(VS1053_PIN_DREQ);  // DREQ int
 
   strip.begin();	//初始化LED
   strip.setPixelColor(0, strip.Color(255, 255, 255));
@@ -37,7 +30,7 @@ void loop() {
   if (getPIR(BODY_PIN1, BODY_PIN2)) { //COMING IN
     strip.setPixelColor(0, strip.Color(0, 255, 0));
     strip.show();
-    audio.chooseMusic(1);
+    midiPlayer.playROM(welcome, sizeof(welcome));
     Serial.println("COMING IN");
     delay(2500);
     strip.setPixelColor(0, strip.Color(255, 255, 255));
@@ -47,7 +40,7 @@ void loop() {
   if (getPIR(BODY_PIN2, BODY_PIN1)) { //GOING OUT
     strip.setPixelColor(0, strip.Color(0, 0, 255));
     strip.show();
-    audio.chooseMusic(2);
+    midiPlayer.playROM(bye, sizeof(bye));
     Serial.println("GOING OUT");
     delay(2500);
     strip.setPixelColor(0, strip.Color(255, 255, 255));
